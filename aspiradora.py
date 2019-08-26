@@ -25,16 +25,14 @@ class Environment:
 
     def process_action(self,action):
         print(action)
-        return getattr(self, "proccess_"+action, lambda: False)()
+        return getattr(self, "process_"+action, lambda: False)()
 
     def process_right(self):
-        print("derecha")
         if(self.xPos<(self.xSize-1)):
             self.xPos+=1
         return
 
     def process_left(self):
-        print("izquierda")
         if(self.xPos>0):
             self.xPos-=1
         return
@@ -65,8 +63,8 @@ class Environment:
             self.process_action(action)
             step+=1
             self.print_environment()
-            print(step,action)
-            sleep(1)
+            print(step)
+            sleep(0.1)
 
 
     def print_environment(self):
@@ -82,11 +80,13 @@ class Environment:
 
 class Aspiradora:           
     def think(self,xPos,yPos,xSize,ySize,dirty): # implementa las acciones a seguir por el agente
-        if(xPos==0 and yPos == 0):
+        if(dirty):
+            return "clean"
+        elif(xPos==0 and yPos == 0):
             return "right"
         elif(xPos==0):
             return "up"
-        elif(xPos==xSize-1 or xPos==1):
+        elif((xPos==xSize-1 and yPos%2==0 ) or (xPos==1 and yPos%2==1 and yPos<ySize-1)):
             return "down"
         elif(yPos%2==0):
             return "right"
