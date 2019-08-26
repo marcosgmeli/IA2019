@@ -8,17 +8,22 @@ class Environment:
     def __init__(self,xSize,ySize,dirt_rate):
         self.xSize=xSize
         self.ySize=ySize
-        self.step=0
-        self.xPos = rm.randrange(xSize)
-        self.yPos = rm.randrange(ySize)
+        self.seed=rm.randrange(1000)
         self.simb=[".","X"]
-        self.matrix = np.zeros( (xSize, ySize) )
         self.dirtQty = round(xSize*ySize*dirt_rate)
-        for i in range(self.dirtQty):
+        self.resetWorld()
+        
+    def resetWorld(self):
+        rm.seed(self.seed)
+        self.step=0
+        self.xPos = rm.randrange(self.xSize)
+        self.yPos = rm.randrange(self.ySize)
+        self.matrix = np.zeros( (self.xSize, self.ySize) )
+        for _ in range(self.dirtQty):
             done=False
             while(not done):
-                x=rm.randrange(xSize)
-                y=rm.randrange(ySize)
+                x=rm.randrange(self.xSize)
+                y=rm.randrange(self.ySize)
                 if(self.matrix[x][y]==0):
                     self.matrix[x][y]=1
                     done=True
@@ -57,14 +62,15 @@ class Environment:
         print("Performance={}".format(self.dirtQty-np.sum(self.matrix)))
 
     def run_agent(self,agent):
-        step = 0
-        while(step<1000):
+        self.resetWorld()
+        while(self.step<300):
             action=agent.think(self.xPos,self.yPos,self.xSize,self.ySize,self.is_dirty())
             self.process_action(action)
-            step+=1
+            self.step+=1
             self.print_environment()
-            print(step)
-            sleep(0.1)
+            print(self.step)
+            self.print_performance()
+            sleep(0.02)
 
 
     def print_environment(self):
@@ -95,4 +101,5 @@ class Aspiradora:
 
 
 env = Environment(10,10,0.1)
+env.run_agent(Aspiradora())
 env.run_agent(Aspiradora())
