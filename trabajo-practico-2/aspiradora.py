@@ -99,7 +99,15 @@ class Aspiradora:
         else:
             return "left"
 
+class AspiradoraAleatoria:      
+    estados = ["right","up","down","left"]     
+    def think(self,xPos,yPos,xSize,ySize,dirty): # implementa las acciones a seguir por el agente
+        if(dirty):
+            return "clean"
+        else:
+            return self.estados[rm.randrange(4)]
+
 
 env = Environment(10,10,0.1)
 env.run_agent(Aspiradora())
-env.run_agent(Aspiradora())
+env.run_agent(AspiradoraAleatoria())
