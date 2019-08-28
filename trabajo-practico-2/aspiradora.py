@@ -29,7 +29,6 @@ class Environment:
                     done=True
 
     def process_action(self,action):
-        print(action)
         return getattr(self, "process_"+action, lambda: False)()
 
     def process_right(self):
@@ -63,14 +62,16 @@ class Environment:
 
     def run_agent(self,agent):
         self.resetWorld()
-        while(self.step<300):
+        while(self.step<1000):
             action=agent.think(self.xPos,self.yPos,self.xSize,self.ySize,self.is_dirty())
             self.process_action(action)
             self.step+=1
-            self.print_environment()
-            print(self.step)
-            self.print_performance()
-            sleep(0.02)
+            #self.print_environment()
+            #print(self.step)
+            #self.print_performance()
+            #sleep(0.02)
+        self.print_performance()
+
 
 
     def print_environment(self):
@@ -108,6 +109,15 @@ class AspiradoraAleatoria:
             return self.estados[rm.randrange(4)]
 
 
-env = Environment(10,10,0.1)
+env = Environment(128,128,0.1)
+env.run_agent(Aspiradora())
+env.run_agent(AspiradoraAleatoria())
+env = Environment(128,128,0.2)
+env.run_agent(Aspiradora())
+env.run_agent(AspiradoraAleatoria())
+env = Environment(128,128,0.4)
+env.run_agent(Aspiradora())
+env.run_agent(AspiradoraAleatoria())
+env = Environment(128,128,0.8)
 env.run_agent(Aspiradora())
 env.run_agent(AspiradoraAleatoria())
