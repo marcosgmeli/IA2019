@@ -1,0 +1,138 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(readr)
+library(dplyr)
+library(caret)
+library(doMC)
+library(MASS)
+library(misc3d)
+library(rgl)
+amzds <- read_csv("Downloads/arbolado-publico-mendoza/arbolado-mza-dataset.csv")
+colnames(amzds) <- make.names(colnames(amzds))
+amzds$inclinacion_peligrosa <- as.factor(amzds$inclinacion_peligrosa)
+amzds$especie <- as.factor(amzds$especie)
+especiesLevel <- levels(amzds$especie)
+amzds$especie <- as.numeric(amzds$especie)
+amzds$lat <- as.numeric(amzds$lat)
+amzds$long <- as.numeric(amzds$long)
+amzds$ultima_modificacion <- as.numeric(as.POSIXct(amzds$ultima_modificacion,format="%d/%m/%Y %H:%M",tz="GMT"))
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+danger <- amzds %>% filter(inclinacion_peligrosa == 'peligro')
+total <- amzds
+
+f1 <- kde2d(danger$long, danger$lat, n = 1000,lims=c(range(amzds$long),range(amzds$lat)))
+image(f1)
+
+f2 <- kde2d(total$long, total$lat, n = 1000,lims= c(range(amzds$long),range(amzds$lat)))
+image(f2)
+
+dangerDensity <- f1$z / f2$z
+
+dangerFF <- cbind(danger$especie,danger$circ_tronco_cm,danger$altura)
+totalFF <- cbind(total$especie,total$circ_tronco_cm,total$altura)
+
+circ_cm_vector<-seq(from = 5, to = 500, length.out = 100)
+especie_vector <- seq(from=0,to=32,length.out = 100)
+altura_vector <- seq(from=0,to=49.5,length.out = 100)
+dd1 <- ks::kde(x = dangerFF,eval.points = totalFF)
+dd2 <- ks::kde(x = totalFF,eval.points = totalFF)
+
+formFactorDensity <- dd1$estimate / dd2$estimate
+```
+
+```{r}
+densityIndices <- cbind(findInterval(amzds$long,f1$x,all.inside = TRUE),findInterval(amzds$lat,f1$y,all.inside = TRUE))
+amzds$density_zone <- dangerDensity[densityIndices]
+
+
+amzds$formfactor_density <- formFactorDensity
+
+```
+
+```{r}
+registerDoMC(cores = 5) 
+ctrl_fast <- trainControl(method="cv", 
+                       number=5, 
+                       verboseIter=T,
+                     classProbs=F,
+                     allowParallel = TRUE
+                     )  
+peligrosos <- amzds %>% filter(inclinacion_peligrosa == "peligro") %>% sample_n(500)
+no_peligrosos <- amzds %>% filter(inclinacion_peligrosa == "sin_peligro") %>% sample_n(300)
+train_data <-  rbind(peligrosos,no_peligrosos)
+train_formula<-formula(inclinacion_peligrosa~especie+circ_tronco_cm+density_zone+ultima_modificacion+altura)
+
+model<- train(train_formula,
+               data = train_data,
+               tuneLength=5,
+               #method="rpart",
+               method = "rf",
+               #method = "knn",
+               #preProcess=c("scale","center"),
+               trControl = ctrl_fast)
+importance <- varImp(model, scale=FALSE)
+model
+plot(importance)
+```
+```{r}
+registerDoMC(cores = 5) 
+ctrl_fast <- trainControl(method="cv", 
+                       number=5, 
+                       verboseIter=T,
+                     classProbs=F,
+                     allowParallel = TRUE
+                     )  
+peligrosos <- amzds %>% filter(inclinacion_peligrosa == "peligro") %>% sample_n(500)
+no_peligrosos <- amzds %>% filter(inclinacion_peligrosa == "sin_peligro") %>% sample_n(300)
+train_data <-  rbind(peligrosos,no_peligrosos)
+train_formula<-formula(inclinacion_peligrosa~density_zone+ultima_modificacion+formfactor_density)
+
+model<- train(train_formula,
+               data = train_data,
+               tuneLength=5,
+               #method="rpart",
+               #method = "rf",
+               method = "knn",
+               #preProcess=c("scale","center"),
+               trControl = ctrl_fast)
+importance <- varImp(model, scale=FALSE)
+model
+plot(importance)
+```
+```{r}
+amztest <- read_csv("Downloads/arbolado-publico-mendoza/arbolado-mza-dataset-test.csv")
+colnames(amztest) <- make.names(colnames(amztest))
+indicestest <- cbind(findInterval(amztest$long,f1$x,all.inside = TRUE),findInterval(amztest$lat,f1$y,all.inside = TRUE))
+amztest$density_zone <- dangerDensity[indicestest]
+colnames(amztest) <- make.names(colnames(amztest))
+amztest$especie <- as.factor(amztest$especie)
+levels(amztest$especie) <- especiesLevel
+amztest$especie <- as.numeric(amztest$especie)
+amztest$altura <- as.numeric(amztest$altura)
+amztest$ultima_modificacion <- as.numeric(as.POSIXct(amztest$ultima_modificacion,format="%d/%m/%Y %H:%M",tz="GMT"))
+```
+
+```{r}
+modeltest<-predict(model,amztest)
+frame <- as.data.frame(modeltest)
+res <- cbind(amztest$id,frame$modeltest)
+write.csv(res,"Downloads/arbolado-publico-mendoza/arbolado-mza-predict.csv", row.names = FALSE)
+
+```
+

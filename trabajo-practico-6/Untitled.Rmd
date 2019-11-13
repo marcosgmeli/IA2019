@@ -1,0 +1,76 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(readr)
+amzds <- read_csv("Downloads/arbolado-publico-mendoza/arbolado-mza-dataset.csv")
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+#library(hrbrthemes)
+
+# mtcars dataset is natively available in R
+# head(mtcars)
+count <- amzds %>% group_by(especie,ultima_modificacion,diametro_tronco) %>% summarise(peligrosos=sum(inclinacion_peligrosa==1)/n()) 
+ggplot(amzds, aes(x=long, y=lat) ) +
+  stat_density_2d(aes(fill = inclinacion_peligrosa), geom = "polygon", colour="red")
+# A basic scatterplot with color depending on Species
+library(ggmap)
+mza_map <- get_map(location = "mendoza", zoom = 14,maptype = "roadmap",color = "bw")
+ggmap(mza_map)+
+  stat_density2d(mapping=aes(x = long, y = lat,fill=..level..,alpha=..level..), 
+                 data = amzds %>% filter(inclinacion_peligrosa==1), geom="polygon",  bins=8) +
+  scale_fill_gradient(low = "black", high = "green")
+```
+```{r}
+library(MASS)
+danger <- amzds %>% filter(inclinacion_peligrosa == 1)
+plot(danger$long, danger$lat, xlim = c(-68.88050,-68.81840), ylim = c(-32.90440,-32.86230))
+f1 <- kde2d(danger$long, danger$lat, n = 10, lims = c(-68.88050,-68.81840, -32.90440,-32.86230))
+image(f1)
+```
+
+```{r}
+
+amzds$density_zone <- with(amzds,f1$z[findInterval(long,f1$x),findInterval(lat,f1$y)])
+```
+
+```{r}
+library(caret)
+
+ctrl_fast <- trainControl(method="cv", 
+                       number=5, 
+                       verboseIter=T,
+                     classProbs=F,
+                     allowParallel = FALSE
+                  
+                     )  
+
+train_formula<-formula(inclinacion_peligrosa~especie+altura+circ_tronco_cm+density_zone)
+
+rfFitupsam<- train(train_formula,
+               data = amzds,
+               tuneLength=9,
+               method="rpart",
+               #method = "rf",
+               #method = "knn",
+               #preProcess=c("scale","center"),
+               trControl = ctrl_fast)
+
+```
+
